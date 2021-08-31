@@ -1,0 +1,187 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}To do list - REST API{% endblock title %}
+
+{% block css %}
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+
+	<link href="https://fonts.googleapis.com/css?family=Montserrat&display=swap" rel="stylesheet">
+
+	<link href="{% static '/css/style.css' %}" rel="stylesheet"/>
+{% endblock css %}
+    
+{% block content %}
+    <div class="container">
+
+		<div id="task-container">
+			<div id="form-wrapper">
+				<form id="form">
+					<div class="flex-wrapper">
+						<div style="flex: 6">
+							<input id="title" class="form-control" type="text" name="title" placeholder="Add task">
+						</div>
+						<div style="flex: 1">
+							<input id="submit" class="btn" type="submit" >
+						</div>
+					</div>
+				</form>
+			</div>
+
+			<div id="list-wrapper">
+			
+			</div>	
+		</div>
+
+	</div>
+{% endblock content %}
+
+{% block script %}
+
+	{% comment %} <script src="{% static '/js/app.js' %}"></script> {% endcomment %}
+
+	<script>
+
+		buildList()
+
+		function buildList(){
+			var listWrapper = document.getElementById('list-wrapper');
+			var url = 'http://127.0.0.1:8000/api/task-list';
+			listWrapper.innerHTML = '';
+
+			fetch(url)
+				.then((res) => res.json())
+				.then((data) => {
+					for (var i in data){
+						var tagTitle = data[i].status ? 'strike' : 'span';
+
+						var item = `
+									<div id="data-row-${i}" class="task-wrapper flex-wrapper">
+										<div style="flex:7">
+											<${tagTitle} class="title">${data[i].title}</${tagTitle}>
+										</div>
+										<div style="flex:1">
+											<button class="btn btn-sm btn-outline-info edit">Edit </button>
+										</div>
+										<div style="flex:1">
+											<button class="btn btn-sm btn-outline-dark delete">-</button>
+										</div>
+									</div>
+									`;
+						listWrapper.innerHTML += item;
+					}
+
+					for (var i in data){
+						var editBtn = document.getElementsByClassName('edit')[i];
+						var deleteBtn = document.getElementsByClassName('delete')[i];
+						var title = document.getElementsByClassName('title')[i];
+
+						editBtn.addEventListener('click', ((item) => {
+							return function(){
+								editItem(item)
+							}
+						})(data[i]))
+
+						deleteBtn.addEventListener('click', ((item) => {
+							return function(){
+								deleteItem(item)
+							}
+						})(data[i]))
+
+						title.addEventListener('click', ((item) => {
+							return function(){
+								strikeUnStrike(item)
+							}
+						})(data[i]))
+
+					}
+				})
+		}
+
+		var form = document.getElementById('form');
+		
+		var activeItem = null;
+
+		function getCookie(name) {
+			let cookieValue = null;
+			if (document.cookie && document.cookie !== '') {
+				const cookies = document.cookie.split(';');
+				for (let i = 0; i < cookies.length; i++) {
+					const cookie = cookies[i].trim();
+					// Does this cookie string begin with the name we want?
+					if (cookie.substring(0, name.length + 1) === (name + '=')) {
+						cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+						break;
+					}
+				}
+			}
+			return cookieValue;
+		}
+		const csrftoken = getCookie('csrftoken');
+
+		form.addEventListener('submit', (e) => {
+			e.preventDefault();
+			var title = document.getElementById('title').value;
+			var url = 'http://127.0.0.1:8000/api/task-create';
+
+			console.log(activeItem);
+			if (activeItem != null){
+				url = `http://127.0.0.1:8000/api/task-update/${activeItem.id}`;
+				activeItem = null;
+			}
+
+			fetch(url, {
+				method: 'POST',
+				headers: {
+					'Content-type' : 'application/json',
+					'X-CSRFToken' : csrftoken,
+				},
+				body: JSON.stringify({'title' : title})
+			})
+				.then( (res) => {
+					buildList()
+					form.reset()
+				})
+			
+		})
+
+		function editItem(item){
+			document.getElementById('title').value = item.title;
+			activeItem = item;
+		}
+
+		function deleteItem(item){
+			console.log('click delete button ' + item.id);
+
+			var url = `http://127.0.0.1:8000/api/task-delete/${item.id}`
+			fetch(url, {
+				method: 'DELETE',
+				headers: {
+					'Content-type' : 'application/json',
+					'X-CSRFToken' : csrftoken,
+				}
+			}).then( (res) => {
+				buildList()
+			})
+		}
+
+		function strikeUnStrike(item){
+			var url = `http://127.0.0.1:8000/api/task-update/${item.id}`
+			item.status = !item.status;
+			console.log(item);
+
+			fetch(url, {
+				method: 'POST',
+				headers: {
+					'Content-type' : 'application/json',
+					'X-CSRFToken' : csrftoken,
+				},
+				body: JSON.stringify({'title' : item.title, 'status' : item.status})
+			}).then( (res) => {
+				buildList()
+			})
+		}
+
+	</script>
+
+{% endblock script %}
